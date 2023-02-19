@@ -10,6 +10,7 @@ const nextConfig = {
     unoptimized: true,
   },
   trailingSlash: true,
+  basePath: "/latex-renderer",
 };
 
 module.exports = nextConfig;

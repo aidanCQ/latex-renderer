@@ -9,6 +9,7 @@ import { downloader, downloadURL } from "../utils/downloadData";
 import { RiCheckboxCircleFill } from "react-icons/ri";
 import { BiLoaderAlt } from "react-icons/bi";
 import { SiConvertio } from "react-icons/si";
+import Image from "next/image";
 // const useStickyState = <T extends unknown>(
 //   key: string,
 //   fallbackState: T
@@ -111,9 +112,6 @@ export default function Home() {
           let url = window.URL.createObjectURL(
             new Blob([data], { type: type.mimeType })
           );
-          // if (type.extension === ".svg") {
-          //       downloadURL({url, fileName})
-          // }
 
           return url;
         }
@@ -121,8 +119,6 @@ export default function Home() {
     },
     { keepPreviousData: false, refetchOnWindowFocus: false }
   );
-
-  console.log(imageRender.data);
 
   return (
     <>
@@ -142,7 +138,7 @@ export default function Home() {
             <span className="mx-6 text-zinc-400">|</span>
             <h2 className="inline-block text-zinc-300 text-sm mt-1">{`Convert LaTeX formulae to raster and vector images.`}</h2>
           </div>
-          <div className="w-full flex bg-zinc-50">
+          <div className="w-full h-full flex bg-zinc-50">
             <div className="w-1/2 p-6">
               <div className="h-12 mb-2 flex items-center">
                 <span className="block uppercase font-medium mb-2 text-zinc-600 text-sm ">
@@ -150,7 +146,7 @@ export default function Home() {
                 </span>
               </div>
               <textarea
-                className="p-2 border-2 w-full border-zinc-300 bg-white h-40 resize-none"
+                className="p-2 border-2 w-full border-zinc-300 bg-white h-96 resize-none"
                 onChange={(e) => {
                   setLatex(e.target.value);
                 }}
@@ -211,35 +207,33 @@ export default function Home() {
                     disabled={!imageRender.data}
                     className="transition disabled:bg-zinc-100 disabled:text-zinc-300 bg-zinc-900 rounded text-zinc-100 py-1 px-2"
                   >
-                    {/* {imageRender.isFetching ? (
-                    <BiLoaderAlt className="inline-block animate-spin h-7 w-7" />
-                  ) : ( */}
                     <span>Export</span>
-                    {/* )} */}
                   </button>
                 </div>
               </div>
-              <div className="relative h-40 border-2 border-zinc-300">
+              <div className="relative h-96 border-2 border-zinc-300">
                 {imageRender.isFetching ? (
                   <div className="transition absolute bg-white w-full h-full flex items-center justify-center">
                     Rendering...
                   </div>
                 ) : null}
                 <div className="p-2  bg-white h-full w-full overflow-auto">
-                  <img
-                    src={imageRender.data}
-                    height={height / 3}
-                    width={width / 3}
+                  <Image
+                    src={imageRender.data ?? ""}
+                    alt="bro"
+                    width={width / 2}
+                    height={height / 2}
                   />
+                  {/* <img  height={height} width={width} /> */}
                 </div>
               </div>
             </div>
           </div>
-          <div className="w-full h-px bg-zinc-400"></div>
+          {/* <div className="w-full h-px bg-zinc-400"></div> */}
 
           <div className="absolute" style={{ top: "-9999999999px" }}>
             <div ref={ref} style={{ fontSize: "6rem" }}>
-              <div className="p-2 w-min h-min">
+              <div className="p-2">
                 <div
                   dangerouslySetInnerHTML={{
                     __html: katex.renderToString(debouncedState, {

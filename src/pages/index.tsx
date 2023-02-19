@@ -1,11 +1,129 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import { Inter } from '@next/font/google'
-import styles from '@/styles/Home.module.css'
+import Head from "next/head";
+import { Inter } from "@next/font/google";
+import React, { ComponentProps, ReactComponentElement } from "react";
+import katex from "katex";
+import { useDimensions } from "../utils/useDimensions";
+import { useQuery } from "react-query";
+import domtoimage from "dom-to-image";
+import { downloader, downloadURL } from "../utils/downloadData";
+import { RiCheckboxCircleFill } from "react-icons/ri";
+import { BiLoaderAlt } from "react-icons/bi";
+import { SiConvertio } from "react-icons/si";
+// const useStickyState = <T extends unknown>(
+//   key: string,
+//   fallbackState: T
+// ): [T, (newState: T) => void] => {
+//   const localStorageKey = `stickyState-${key}`;
+//   const [state, _setState] = React.useState<T>(fallbackState);
 
-const inter = Inter({ subsets: ['latin'] })
+//   React.useEffect(() => {
+//     JSON.parse(localStorage.getItem(localStorageKey) ?? "") ?? fallbackState;
+//   }, [fallbackState, localStorageKey]);
+//   const setState = React.useCallback(
+//     (newState: T) => {
+//       localStorage.setItem(localStorageKey, JSON.stringify(newState));
+//       _setState(newState);
+//     },
+//     [localStorageKey]
+//   );
+//   return [state, setState];
+// };
 
+export const fileTypes = ["jpeg", "png", "svg"] as const;
+type FileType = typeof fileTypes[number];
+
+export const methodMap: {
+  [k in FileType]: {
+    method: keyof domtoimage;
+    extension: string;
+    mimeType: string;
+  };
+} = {
+  jpeg: {
+    method: "toJpeg",
+    extension: ".jpeg",
+    mimeType: "image/jpeg",
+  },
+  png: {
+    method: "toPng",
+    extension: ".png",
+    mimeType: "image/png",
+  },
+  svg: {
+    method: "toSvg",
+    extension: ".svg",
+    mimeType: "image/svg+xml;charset=utf-8",
+  },
+};
+
+const Label = (props: ComponentProps<"label">) => {
+  return <label className="font-bold block mb-1">{props.children}</label>;
+};
+
+const useStateDebounced = <T extends unknown>(props: T) => {
+  const [rawState, _setRawState] = React.useState(props);
+  const [debouncedState, _setDebouncedState] = React.useState(props);
+  const [timer, setTimer] = React.useState<NodeJS.Timeout>();
+  const setStateDebounced = (newState: T) => {
+    _setRawState(newState);
+    if (timer) clearTimeout(timer);
+    setTimer(
+      setTimeout(() => {
+        _setDebouncedState(newState);
+        clearTimeout(timer);
+      }, 250)
+    );
+  };
+  return { rawState, debouncedState, setStateDebounced } as const;
+};
 export default function Home() {
+  const {
+    rawState: latex,
+    debouncedState,
+    setStateDebounced: setLatex,
+  } = useStateDebounced<string>("");
+  const [fileName, setFileName] = React.useState<string>("convertedLatex");
+  const [fileType, setFileType] = React.useState<FileType>("png");
+
+  const { ref, dimensions, node } = useDimensions<HTMLDivElement>();
+  const height = Math.round(dimensions ? dimensions.height : 0);
+  const width = Math.round(dimensions ? dimensions.width : 0);
+  const type = methodMap[fileType];
+
+  const imageRender = useQuery(
+    ["render", type, node?.innerHTML, height, width],
+    async () => {
+      if (node) {
+        const blob = await domtoimage[type.method](node, {
+          quality: 1,
+          height: height,
+          width: width,
+          bgcolor: fileType === "jpeg" ? "#ffffff" : "transparent",
+          style: {
+            // Setting just the width and height does not scale the image content.
+            transform: `scale(${1})`,
+            transformOrigin: "top left",
+          },
+        });
+
+        if (typeof blob === "string") {
+          const data = await fetch(blob).then((d) => d.blob());
+          let url = window.URL.createObjectURL(
+            new Blob([data], { type: type.mimeType })
+          );
+          // if (type.extension === ".svg") {
+          //       downloadURL({url, fileName})
+          // }
+
+          return url;
+        }
+      }
+    },
+    { keepPreviousData: false, refetchOnWindowFocus: false }
+  );
+
+  console.log(imageRender.data);
+
   return (
     <>
       <Head>
@@ -14,110 +132,127 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <main className={styles.main}>
-        <div className={styles.description}>
-          <p>
-            Get started by editing&nbsp;
-            <code className={styles.code}>src/pages/index.tsx</code>
-          </p>
-          <div>
-            <a
-              href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              By{' '}
-              <Image
-                src="/vercel.svg"
-                alt="Vercel Logo"
-                className={styles.vercelLogo}
-                width={100}
-                height={24}
-                priority
+      <main className="flex w-screen h-screen font-sans">
+        <div className="w-full">
+          <div className="bg-zinc-900 p-4 px-5 flex items-center">
+            <SiConvertio className="text-zinc-50 h-6 w-6 mr-2 mt-px"></SiConvertio>
+            <h1 className="text-2xl text-zinc-50 font-semibold inline-block">
+              LaTeX to Image
+            </h1>
+            <span className="mx-6 text-zinc-400">|</span>
+            <h2 className="inline-block text-zinc-300 text-sm mt-1">{`Convert LaTeX formulae to raster and vector images.`}</h2>
+          </div>
+          <div className="w-full flex bg-zinc-50">
+            <div className="w-1/2 p-6">
+              <div className="h-12 mb-2 flex items-center">
+                <span className="block uppercase font-medium mb-2 text-zinc-600 text-sm ">
+                  Latex
+                </span>
+              </div>
+              <textarea
+                className="p-2 border-2 w-full border-zinc-300 bg-white h-40 resize-none"
+                onChange={(e) => {
+                  setLatex(e.target.value);
+                }}
+                value={latex}
               />
-            </a>
+            </div>
+            <div className="w-1/2 p-6">
+              <div className="flex items-center justify-between mb-2 h-12">
+                <span className="block uppercase  font-medium   text-zinc-600 text-sm">
+                  Rendered Image
+                </span>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center text-sm">
+                    {(["jpeg", "svg", "png"] as const).map((type, idx, arr) => {
+                      const isLast = arr.length - 1 === idx;
+                      const isFirst = idx === 0;
+                      return (
+                        <button
+                          onClick={() => setFileType(type)}
+                          key={type}
+                          className={`border border-zinc-400 -gap-px uppercase px-2 py-1 ${
+                            isFirst
+                              ? "rounded-l"
+                              : isLast
+                              ? "rounded-r"
+                              : "-mx-px"
+                          } ${
+                            fileType === type
+                              ? "bg-zinc-900 text-zinc-50 "
+                              : "bg-zinc-100 text-zinc-500 "
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      placeholder="File name"
+                      value={fileName}
+                      onChange={(e) => setFileName(e.target.value)}
+                      className="border border-zinc-300 bg-zinc-100 px-2 py-1 rounded"
+                      type="text"
+                    ></input>
+                    <span className="ml-1 w-12">{type.extension}</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (imageRender.data) {
+                        const url = imageRender.data;
+                        downloadURL({ url, fileName });
+                        window.URL.revokeObjectURL(url);
+                      }
+                    }}
+                    placeholder={fileName}
+                    disabled={!imageRender.data}
+                    className="transition disabled:bg-zinc-100 disabled:text-zinc-300 bg-zinc-900 rounded text-zinc-100 py-1 px-2"
+                  >
+                    {/* {imageRender.isFetching ? (
+                    <BiLoaderAlt className="inline-block animate-spin h-7 w-7" />
+                  ) : ( */}
+                    <span>Export</span>
+                    {/* )} */}
+                  </button>
+                </div>
+              </div>
+              <div className="relative h-40 border-2 border-zinc-300">
+                {imageRender.isFetching ? (
+                  <div className="transition absolute bg-white w-full h-full flex items-center justify-center">
+                    Rendering...
+                  </div>
+                ) : null}
+                <div className="p-2  bg-white h-full w-full overflow-auto">
+                  <img
+                    src={imageRender.data}
+                    height={height / 3}
+                    width={width / 3}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+          <div className="w-full h-px bg-zinc-400"></div>
 
-        <div className={styles.center}>
-          <Image
-            className={styles.logo}
-            src="/next.svg"
-            alt="Next.js Logo"
-            width={180}
-            height={37}
-            priority
-          />
-          <div className={styles.thirteen}>
-            <Image
-              src="/thirteen.svg"
-              alt="13"
-              width={40}
-              height={31}
-              priority
-            />
+          <div className="absolute" style={{ top: "-9999999999px" }}>
+            <div ref={ref} style={{ fontSize: "6rem" }}>
+              <div className="p-2 w-min h-min">
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: katex.renderToString(debouncedState, {
+                      throwOnError: false,
+                      trust: true,
+                    }),
+                  }}
+                ></div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className={styles.grid}>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Docs <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Find in-depth information about Next.js features and&nbsp;API.
-            </p>
-          </a>
-
-          <a
-            href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Learn <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Learn about Next.js in an interactive course with&nbsp;quizzes!
-            </p>
-          </a>
-
-          <a
-            href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Templates <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Discover and deploy boilerplate example Next.js&nbsp;projects.
-            </p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <h2 className={inter.className}>
-              Deploy <span>-&gt;</span>
-            </h2>
-            <p className={inter.className}>
-              Instantly deploy your Next.js site to a shareable URL
-              with&nbsp;Vercel.
-            </p>
-          </a>
         </div>
       </main>
     </>
-  )
+  );
 }

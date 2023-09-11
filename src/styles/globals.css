@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/**/
 img {
   image-rendering: optimizeSpeed;
   image-rendering: -moz-crisp-edges;
